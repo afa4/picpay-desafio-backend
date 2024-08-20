@@ -14,7 +14,27 @@ type Transaction struct {
 }
 
 func main() {
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/", getRootHandler())
+	http.HandleFunc("/transfer", postTransactionHandler())
+	http.ListenAndServe(":8080", nil)
+}
+
+func getRootHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		w.Write([]byte("Hello World!"))
+	}
+}
+
+func postTransactionHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
 		body, err := io.ReadAll(r.Body)
 		transaction := Transaction{}
 		json.Unmarshal(body, &transaction)
@@ -24,8 +44,7 @@ func main() {
 		}
 
 		w.Write([]byte("Hello World!" + " " + fmt.Sprintf("%d", transaction.Payer) + " " + fmt.Sprintf("%d", transaction.Payee) + " " + fmt.Sprintf("%f", transaction.Amount)))
-	})
-	http.ListenAndServe(":8080", nil)
+	}
 }
 
 // todo: use channel to process transaction atomically
