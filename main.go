@@ -8,17 +8,17 @@ import (
 	"time"
 )
 
-type Transaction struct {
+type TransferRequest struct {
 	Payer  int32   `json:"payer"`
 	Payee  int32   `json:"payee"`
 	Amount float64 `json:"value"`
 }
 
 func main() {
-	transactionChannel := make(chan Transaction)
-	go transactionRoutine(&transactionChannel)
+	transferChannel := make(chan TransferRequest)
+	go transferRoutine(&transferChannel)
 	http.HandleFunc("/", getRootHandler())
-	http.HandleFunc("/transfer", postTransactionHandler(&transactionChannel))
+	http.HandleFunc("/transfer", postTransferHandler(&transferChannel))
 	http.ListenAndServe(":8080", nil)
 }
 
@@ -28,37 +28,45 @@ func getRootHandler() http.HandlerFunc {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
+		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("Hello World!"))
 	}
 }
 
-func postTransactionHandler(transactionChannel *chan Transaction) http.HandlerFunc {
+func postTransferHandler(transferChannel *chan TransferRequest) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
 		body, err := io.ReadAll(r.Body)
-		transaction := Transaction{}
-		json.Unmarshal(body, &transaction)
+		transferReq := TransferRequest{}
 		if err != nil {
 			http.Error(w, "Error reading request body", http.StatusInternalServerError)
 			return
 		}
-		*transactionChannel <- transaction
+		err = json.Unmarshal(body, &transferReq)
+		if err != nil {
+			http.Error(w, "Error parsing json", http.StatusInternalServerError)
+			return
+		}
+		*transferChannel <- transferReq
 		w.WriteHeader(http.StatusAccepted)
-		w.Write([]byte("Hello World!" + " " + fmt.Sprintf("%d", transaction.Payer) + " " + fmt.Sprintf("%d", transaction.Payee) + " " + fmt.Sprintf("%f", transaction.Amount)))
+		w.Write([]byte("Hello World!" + " " + fmt.Sprintf("%d", transferReq.Payer) + " " + fmt.Sprintf("%d", transferReq.Payee) + " " + fmt.Sprintf("%f", transferReq.Amount)))
 	}
 }
 
-func transactionRoutine(transactionChannel *chan Transaction) {
-	fmt.Println("Transaction routine started")
-	for {
-		transaction := <-*transactionChannel
+func transferRoutine(transferChannel *chan TransferRequest) {
+	fmt.Println("Transfer routine started")
+	for transferReq := range *transferChannel {
 		time.Sleep(1 * time.Second)
-		fmt.Println("Transaction received")
-		fmt.Println(transaction)
+		fmt.Println("Transfer received")
+		executeTransfer(transferReq)
 	}
 }
 
-// todo: use channel to process transaction atomically
+func executeTransfer(transferReq TransferRequest) {
+	fmt.Println(transferReq)
+}
+
+// todo: use channel to process Transfer atomically
