@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -14,15 +15,22 @@ type TransferRequest struct {
 	Amount float64 `json:"value"`
 }
 
+type TransferResponse struct {
+	Payer  int32   `json:"payer"`
+	Payee  int32   `json:"payee"`
+	Amount float64 `json:"value"`
+}
+
 func main() {
+	mongoDAO := NewMongoDAO("mongodb://root:example@mongo:27017/")
 	transferChannel := make(chan TransferRequest)
-	go transferRoutine(&transferChannel)
-	http.HandleFunc("/", getRootHandler())
-	http.HandleFunc("/transfer", postTransferHandler(&transferChannel))
+	go transferRoutine(&transferChannel, mongoDAO)
+	http.HandleFunc("/transfer", handleTransfer(&transferChannel, mongoDAO))
+	http.HandleFunc("/", handleRoot())
 	http.ListenAndServe(":8080", nil)
 }
 
-func getRootHandler() http.HandlerFunc {
+func handleRoot() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -33,40 +41,74 @@ func getRootHandler() http.HandlerFunc {
 	}
 }
 
-func postTransferHandler(transferChannel *chan TransferRequest) http.HandlerFunc {
+func handleTransfer(transferChannel *chan TransferRequest, mongoDAO *MongoDAO) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "POST" {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		if r.Method == "POST" {
+			postTransferHandler(w, r, transferChannel)
 			return
 		}
-		body, err := io.ReadAll(r.Body)
-		transferReq := TransferRequest{}
-		if err != nil {
-			http.Error(w, "Error reading request body", http.StatusInternalServerError)
+		if r.Method == "GET" {
+			getTransferHandler(w, r, mongoDAO)
 			return
 		}
-		err = json.Unmarshal(body, &transferReq)
-		if err != nil {
-			http.Error(w, "Error parsing json", http.StatusInternalServerError)
-			return
-		}
-		*transferChannel <- transferReq
-		w.WriteHeader(http.StatusAccepted)
-		w.Write([]byte("Hello World!" + " " + fmt.Sprintf("%d", transferReq.Payer) + " " + fmt.Sprintf("%d", transferReq.Payee) + " " + fmt.Sprintf("%f", transferReq.Amount)))
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 
-func transferRoutine(transferChannel *chan TransferRequest) {
+func postTransferHandler(w http.ResponseWriter, r *http.Request, transferChannel *chan TransferRequest) {
+	body, err := io.ReadAll(r.Body)
+	transferReq := TransferRequest{}
+	if err != nil {
+		http.Error(w, "Error reading request body", http.StatusInternalServerError)
+		return
+	}
+	err = json.Unmarshal(body, &transferReq)
+	if err != nil {
+		http.Error(w, "Error parsing json", http.StatusInternalServerError)
+		return
+	}
+	*transferChannel <- transferReq
+	w.WriteHeader(http.StatusAccepted)
+	w.Write([]byte("Hello World!" + " " + fmt.Sprintf("%d", transferReq.Payer) + " " + fmt.Sprintf("%d", transferReq.Payee) + " " + fmt.Sprintf("%f", transferReq.Amount)))
+}
+
+func getTransferHandler(w http.ResponseWriter, r *http.Request, mongoDAO *MongoDAO) {
+	accountIdStr := r.URL.Query().Get("account_id")
+	accountId, err := strconv.Atoi(accountIdStr)
+	if err != nil {
+		http.Error(w, "Invalid account ID", http.StatusBadRequest)
+		return
+	}
+	transfers, err := mongoDAO.GetTransactions(accountId)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	jsonResponse, err := json.Marshal(transfers)
+	if err != nil {
+		http.Error(w, "error marshaling JSON", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(jsonResponse)
+}
+
+func transferRoutine(transferChannel *chan TransferRequest, mongoDAO *MongoDAO) {
 	fmt.Println("Transfer routine started")
 	for transferReq := range *transferChannel {
 		time.Sleep(1 * time.Second)
 		fmt.Println("Transfer received")
-		executeTransfer(transferReq)
+		executeTransfer(transferReq, mongoDAO)
 	}
 }
 
-func executeTransfer(transferReq TransferRequest) {
+func executeTransfer(transferReq TransferRequest, mongoDAO *MongoDAO) {
 	fmt.Println(transferReq)
+	// get all payer transactions to check balance
+	// sum transactions and get customer balance
+	// register money transaction
+	// notify receiver
 }
 
 // todo: use channel to process Transfer atomically
