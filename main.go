@@ -9,21 +9,9 @@ import (
 	"time"
 )
 
-type TransferRequest struct {
-	Payer  int32   `json:"payer"`
-	Payee  int32   `json:"payee"`
-	Amount float64 `json:"value"`
-}
-
-type TransferResponse struct {
-	Payer  int32   `json:"payer"`
-	Payee  int32   `json:"payee"`
-	Amount float64 `json:"value"`
-}
-
 func main() {
 	mongoDAO := NewMongoDAO("mongodb://root:example@mongo:27017/")
-	transferChannel := make(chan TransferRequest)
+	transferChannel := make(chan Transfer)
 	go transferRoutine(&transferChannel, mongoDAO)
 	http.HandleFunc("/transfer", handleTransfer(&transferChannel, mongoDAO))
 	http.HandleFunc("/", handleRoot())
@@ -41,7 +29,7 @@ func handleRoot() http.HandlerFunc {
 	}
 }
 
-func handleTransfer(transferChannel *chan TransferRequest, mongoDAO *MongoDAO) http.HandlerFunc {
+func handleTransfer(transferChannel *chan Transfer, mongoDAO *MongoDAO) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "POST" {
 			postTransferHandler(w, r, transferChannel)
@@ -55,9 +43,9 @@ func handleTransfer(transferChannel *chan TransferRequest, mongoDAO *MongoDAO) h
 	}
 }
 
-func postTransferHandler(w http.ResponseWriter, r *http.Request, transferChannel *chan TransferRequest) {
+func postTransferHandler(w http.ResponseWriter, r *http.Request, transferChannel *chan Transfer) {
 	body, err := io.ReadAll(r.Body)
-	transferReq := TransferRequest{}
+	transferReq := Transfer{}
 	if err != nil {
 		http.Error(w, "Error reading request body", http.StatusInternalServerError)
 		return
@@ -94,7 +82,7 @@ func getTransferHandler(w http.ResponseWriter, r *http.Request, mongoDAO *MongoD
 	w.Write(jsonResponse)
 }
 
-func transferRoutine(transferChannel *chan TransferRequest, mongoDAO *MongoDAO) {
+func transferRoutine(transferChannel *chan Transfer, mongoDAO *MongoDAO) {
 	fmt.Println("Transfer routine started")
 	for transferReq := range *transferChannel {
 		time.Sleep(1 * time.Second)
@@ -103,7 +91,7 @@ func transferRoutine(transferChannel *chan TransferRequest, mongoDAO *MongoDAO) 
 	}
 }
 
-func executeTransfer(transferReq TransferRequest, mongoDAO *MongoDAO) {
+func executeTransfer(transferReq Transfer, mongoDAO *MongoDAO) {
 	fmt.Println(transferReq)
 	// get all payer transactions to check balance
 	// sum transactions and get customer balance

@@ -9,12 +9,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type Transfer struct {
-	Payer  int32   `json:"payer"`
-	Payee  int32   `json:"payee"`
-	Amount float64 `json:"value"`
-}
-
 type MongoDAO struct {
 	mongoClient *mongo.Client
 }
@@ -44,4 +38,12 @@ func (m *MongoDAO) GetTransactions(accountId int) ([]Transfer, error) {
 		transactions = append(transactions, transaction)
 	}
 	return transactions, nil
+}
+
+func (m *MongoDAO) SaveTransaction(transaction Transfer) error {
+	_, err := m.mongoClient.Database("picpay").Collection("transactions").InsertOne(context.TODO(), transaction)
+	if err != nil {
+		return err
+	}
+	return nil
 }
