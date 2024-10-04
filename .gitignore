@@ -12,4 +12,6 @@ npm-debug.log
 yarn-error.log
 .idea
 
+/data/*
+
 picpay-desafio-backend
