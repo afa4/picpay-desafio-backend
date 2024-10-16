@@ -5,8 +5,14 @@ WORKDIR /build
 COPY go.mod go.sum ./
 RUN go mod download
 
-COPY ./src .
+COPY ./src ./src
 
-RUN go build -o /bin/app
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o app ./src
 
-ENTRYPOINT ["/bin/app"]
+FROM alpine:latest
+
+WORKDIR /app/
+
+COPY --from=builder /build/app ./app
+
+ENTRYPOINT ["./app"]
