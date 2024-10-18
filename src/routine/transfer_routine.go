@@ -1,6 +1,7 @@
 package routine
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/afa4/picpay-desafio-backend/src/dao"
@@ -12,9 +13,9 @@ type TransferRoutine struct {
 	transferChannel *chan entity.Transfer
 }
 
-func NewTransferRoutine(mongoDAO dao.MongoDAO, transferChannel *chan entity.Transfer) *TransferRoutine {
+func NewTransferRoutine(mongoDAO *dao.MongoDAO, transferChannel *chan entity.Transfer) *TransferRoutine {
 	return &TransferRoutine{
-		mongoDAO:        &mongoDAO,
+		mongoDAO:        mongoDAO,
 		transferChannel: transferChannel,
 	}
 }
@@ -27,23 +28,26 @@ func (tr *TransferRoutine) transferRoutine() {
 	fmt.Println("Transfer routine started")
 	for transferReq := range *tr.transferChannel {
 		fmt.Println("Transfer received")
-		tr.executeTransfer(transferReq)
+		err := tr.executeTransfer(transferReq)
+		if err != nil {
+			fmt.Printf("Error executing transfer: %s\n", err.Error())
+		}
 	}
 }
 
-func (tr *TransferRoutine) executeTransfer(transferReq entity.Transfer) {
+func (tr *TransferRoutine) executeTransfer(transferReq entity.Transfer) error {
 	if transferReq.Payee == transferReq.Payer {
-		fmt.Println("Payer and payee are the same")
-		return
+		return errors.New("Payer and payee are the same")
 	}
 
-	payerBalance := tr.getBalance(transferReq.Payer)
-	fmt.Printf("account %d balance $%f\n", transferReq.Payer, payerBalance)
+	payerBalance, err := tr.mongoDAO.GetAccountBalance(transferReq.Payer)
+	if err != nil {
+		return err
+	}
 
-	if payerBalance < transferReq.Amount {
+	if payerBalance.Balance < transferReq.Amount {
 		// todo: could be a notification to payer
-		fmt.Printf("Insufficient funds in payer account %d\n", transferReq.Payer)
-		return
+		return errors.New(fmt.Sprintf("Insufficient funds in payer account %d\n", transferReq.Payer))
 	}
 
 	debitTransaction := entity.Transaction{
@@ -63,24 +67,5 @@ func (tr *TransferRoutine) executeTransfer(transferReq entity.Transfer) {
 	tr.mongoDAO.SaveTransaction(creditTransaction, transferReq.Payee)
 
 	fmt.Printf("Transaction made: payerId=%d payeeId=%d\n", transferReq.Payer, transferReq.Payee)
-}
-
-func (tr *TransferRoutine) getBalance(accountId int) float64 {
-	transactions, err := tr.mongoDAO.GetTransactions(accountId)
-
-	if err != nil {
-		fmt.Println("Error getting transactions")
-		return 0
-	}
-
-	balance := 0.0
-	for _, transaction := range transactions {
-		if transaction.Type == "credit" {
-			balance += transaction.Amount
-		} else {
-			balance -= transaction.Amount
-		}
-	}
-
-	return balance
+	return nil
 }

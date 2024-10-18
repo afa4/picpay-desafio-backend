@@ -24,6 +24,25 @@ func NewMongoDAO(uri string) *MongoDAO {
 	return &MongoDAO{mongoClient: client}
 }
 
+func (m *MongoDAO) GetAccountBalance(accountId int) (*entity.Balance, error) {
+	transactions, err := m.GetTransactions(accountId)
+
+	if err != nil {
+		return nil, err
+	}
+
+	balance := 0.0
+	for _, transaction := range transactions {
+		if transaction.Type == "credit" {
+			balance += transaction.Amount
+		} else {
+			balance -= transaction.Amount
+		}
+	}
+
+	return &entity.Balance{Balance: balance}, nil
+}
+
 func (m *MongoDAO) GetTransactions(accountId int) ([]entity.Transaction, error) {
 	srtAccountId := fmt.Sprintf("acc_%d", accountId)
 	result, err := m.mongoClient.Database("transactions").Collection(srtAccountId).Find(context.TODO(), bson.D{})

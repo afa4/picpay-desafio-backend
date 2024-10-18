@@ -11,3 +11,7 @@ type Transaction struct {
 	Amount           float64 `json:"amount"`
 	RelatedAccountID int     `json:"related_account_id"`
 }
+
+type Balance struct {
+	Balance float64 `json:"balance"`
+}

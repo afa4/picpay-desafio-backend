@@ -13,12 +13,17 @@ func NewRootController() *RootController {
 
 func (c *RootController) HandlerFunc() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case "GET":
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("Hello World!"))
-		default:
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
 		}
+
+		if r.Method != "GET" {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("API PicPay API"))
 	}
 }

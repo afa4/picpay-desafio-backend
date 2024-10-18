@@ -15,15 +15,20 @@ func main() {
 	transferChannel := make(chan entity.Transfer)
 
 	// concurrent routine initialization
-	transferRoutine := routine.NewTransferRoutine(*mongoDAO, &transferChannel)
+	transferRoutine := routine.NewTransferRoutine(mongoDAO, &transferChannel)
 	transferRoutine.Start()
 
 	// controller initialization
 	transferController := controller.NewTransferController(mongoDAO, &transferChannel)
+	accountBalanceController := controller.NewAccountBalanceController(mongoDAO)
 	rootController := controller.NewRootController()
 
 	// http server initialization
 	http.HandleFunc("/transfer", transferController.HandlerFunc())
+	http.HandleFunc("/account/balance", accountBalanceController.HandlerFunc())
 	http.HandleFunc("/", rootController.HandlerFunc())
-	http.ListenAndServe(":8080", nil)
+	err := http.ListenAndServe(":8080", nil)
+	if err != nil {
+		panic(err)
+	}
 }
