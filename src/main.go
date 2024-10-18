@@ -1,13 +1,11 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"strconv"
 	"time"
 
+	"github.com/afa4/picpay-desafio-backend/src/controller"
 	dao "github.com/afa4/picpay-desafio-backend/src/dao"
 	entity "github.com/afa4/picpay-desafio-backend/src/entity"
 )
@@ -15,74 +13,12 @@ import (
 func main() {
 	mongoDAO := dao.NewMongoDAO("mongodb://root:example@localhost:27017/")
 	transferChannel := make(chan entity.Transfer)
+	transferController := controller.NewTransferController(mongoDAO, &transferChannel)
+	rootController := controller.NewRootController()
 	go transferRoutine(&transferChannel, mongoDAO)
-	http.HandleFunc("/transfer", handleTransfer(&transferChannel, mongoDAO))
-	http.HandleFunc("/", handleRoot())
+	http.HandleFunc("/transfer", transferController.HandlerFunc())
+	http.HandleFunc("/", rootController.HandlerFunc())
 	http.ListenAndServe(":8080", nil)
-}
-
-func handleRoot() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "GET" {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Hello World!"))
-	}
-}
-
-func handleTransfer(transferChannel *chan entity.Transfer, mongoDAO *dao.MongoDAO) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "POST" {
-			postTransferHandler(w, r, transferChannel)
-			return
-		}
-		if r.Method == "GET" {
-			getTransferHandler(w, r, mongoDAO)
-			return
-		}
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-	}
-}
-
-func postTransferHandler(w http.ResponseWriter, r *http.Request, transferChannel *chan entity.Transfer) {
-	body, err := io.ReadAll(r.Body)
-	transferReq := entity.Transfer{}
-	if err != nil {
-		http.Error(w, "Error reading request body", http.StatusInternalServerError)
-		return
-	}
-	err = json.Unmarshal(body, &transferReq)
-	if err != nil {
-		http.Error(w, "Error parsing json", http.StatusInternalServerError)
-		return
-	}
-	*transferChannel <- transferReq
-	w.WriteHeader(http.StatusAccepted)
-	w.Write([]byte("Hello World!" + " " + fmt.Sprintf("%d", transferReq.Payer) + " " + fmt.Sprintf("%d", transferReq.Payee) + " " + fmt.Sprintf("%f", transferReq.Amount)))
-}
-
-func getTransferHandler(w http.ResponseWriter, r *http.Request, mongoDAO *dao.MongoDAO) {
-	accountIdStr := r.URL.Query().Get("account_id")
-	accountId, err := strconv.Atoi(accountIdStr)
-	if err != nil {
-		http.Error(w, "Invalid account ID", http.StatusBadRequest)
-		return
-	}
-	transfers, err := mongoDAO.GetTransactions(accountId)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	jsonResponse, err := json.Marshal(transfers)
-	if err != nil {
-		http.Error(w, "error marshaling JSON", http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(jsonResponse)
 }
 
 func transferRoutine(transferChannel *chan entity.Transfer, mongoDAO *dao.MongoDAO) {
