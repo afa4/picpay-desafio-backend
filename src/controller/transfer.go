@@ -23,20 +23,20 @@ func NewTransferController(mongoDAO *dao.MongoDAO, transferChannel *chan entity.
 	}
 }
 
-func (c *TransferController) HandlerFunc() http.HandlerFunc {
+func (tc *TransferController) HandlerFunc() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case "POST":
-			c.postTransferHandler(w, r)
+			tc.postTransferHandler(w, r)
 		case "GET":
-			c.getTransferHandler(w, r)
+			tc.getTransferHandler(w, r)
 		default:
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
 	}
 }
 
-func (c *TransferController) postTransferHandler(w http.ResponseWriter, r *http.Request) {
+func (tc *TransferController) postTransferHandler(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	transferReq := entity.Transfer{}
 	if err != nil {
@@ -48,19 +48,19 @@ func (c *TransferController) postTransferHandler(w http.ResponseWriter, r *http.
 		http.Error(w, "Error parsing json", http.StatusInternalServerError)
 		return
 	}
-	*c.transferChannel <- transferReq
+	*tc.transferChannel <- transferReq
 	w.WriteHeader(http.StatusAccepted)
 	w.Write([]byte("Hello World!" + " " + fmt.Sprintf("%d", transferReq.Payer) + " " + fmt.Sprintf("%d", transferReq.Payee) + " " + fmt.Sprintf("%f", transferReq.Amount)))
 }
 
-func (c *TransferController) getTransferHandler(w http.ResponseWriter, r *http.Request) {
+func (tc *TransferController) getTransferHandler(w http.ResponseWriter, r *http.Request) {
 	accountIdStr := r.URL.Query().Get("account_id")
 	accountId, err := strconv.Atoi(accountIdStr)
 	if err != nil {
 		http.Error(w, "Invalid account ID", http.StatusBadRequest)
 		return
 	}
-	transfers, err := c.mongoDAO.GetTransactions(accountId)
+	transfers, err := tc.mongoDAO.GetTransactions(accountId)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
