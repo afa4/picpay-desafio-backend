@@ -24,14 +24,15 @@ func NewMongoDAO(uri string) *MongoDAO {
 	return &MongoDAO{mongoClient: client}
 }
 
-func (m *MongoDAO) GetTransactions(accountId int) ([]entity.Transfer, error) {
-	result, err := m.mongoClient.Database("picpay").Collection("transactions").Find(context.TODO(), bson.M{"payee": accountId})
+func (m *MongoDAO) GetTransactions(accountId int) ([]entity.Transaction, error) {
+	srtAccountId := fmt.Sprintf("acc_%d", accountId)
+	result, err := m.mongoClient.Database("transactions").Collection(srtAccountId).Find(context.TODO(), bson.D{})
 	if err != nil {
 		return nil, err
 	}
-	var transactions []entity.Transfer
+	var transactions []entity.Transaction
 	for result.Next(context.TODO()) {
-		var transaction entity.Transfer
+		var transaction entity.Transaction
 		err := result.Decode(&transaction)
 		if err != nil {
 			return nil, err
@@ -41,8 +42,9 @@ func (m *MongoDAO) GetTransactions(accountId int) ([]entity.Transfer, error) {
 	return transactions, nil
 }
 
-func (m *MongoDAO) SaveTransaction(transaction entity.Transfer) error {
-	_, err := m.mongoClient.Database("picpay").Collection("transactions").InsertOne(context.TODO(), transaction)
+func (m *MongoDAO) SaveTransaction(transaction entity.Transaction, accountId int) error {
+	srtAccountId := fmt.Sprintf("acc_%d", accountId)
+	_, err := m.mongoClient.Database("transactions").Collection(srtAccountId).InsertOne(context.TODO(), transaction)
 	if err != nil {
 		return err
 	}
