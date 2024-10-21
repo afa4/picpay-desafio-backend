@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,14 +13,16 @@ import (
 )
 
 type TransferController struct {
-	mongoDAO        *dao.MongoDAO
+	mongoDAO        dao.IMongoDAO
 	transferChannel *chan entity.Transfer
+	mongoAdapter    dao.IMongoAdapter[entity.Transaction]
 }
 
-func NewTransferController(mongoDAO *dao.MongoDAO, transferChannel *chan entity.Transfer) *TransferController {
+func NewTransferController(mongoDAO *dao.MongoDAO, transferChannel *chan entity.Transfer, mongoAdapter dao.IMongoAdapter[entity.Transaction]) *TransferController {
 	return &TransferController{
 		mongoDAO:        mongoDAO,
 		transferChannel: transferChannel,
+		mongoAdapter:    mongoAdapter,
 	}
 }
 
@@ -60,7 +63,7 @@ func (tc *TransferController) getTransferHandler(w http.ResponseWriter, r *http.
 		http.Error(w, "Invalid account ID", http.StatusBadRequest)
 		return
 	}
-	transfers, err := tc.mongoDAO.GetTransactions(accountId)
+	transfers, err := tc.mongoAdapter.FindAll(context.TODO(), "transactions", fmt.Sprintf("acc_%d", accountId))
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return

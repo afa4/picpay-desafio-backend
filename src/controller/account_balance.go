@@ -10,10 +10,10 @@ import (
 )
 
 type AccountBalanceController struct {
-	mongoDAO *dao.MongoDAO
+	mongoDAO dao.IMongoDAO
 }
 
-func NewAccountBalanceController(mongoDAO *dao.MongoDAO) *AccountBalanceController {
+func NewAccountBalanceController(mongoDAO dao.IMongoDAO) *AccountBalanceController {
 	return &AccountBalanceController{
 		mongoDAO: mongoDAO,
 	}
